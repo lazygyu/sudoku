@@ -1,6 +1,16 @@
 import { boxOf, CELL_COUNT, colOf, hasNote, rowOf, SIZE, valueOf, type Board } from '../model';
 import { h } from './dom';
 
+/** 길게 누르기로 시작된 동작이 이후 포인터 이동/해제를 넘겨받는 인터페이스 */
+export interface HoldHandler {
+  move(x: number, y: number): void;
+  end(x: number, y: number): void;
+  close(): void;
+}
+
+/** 이미 하나만 선택된 칸을 이 시간(ms) 이상 누르고 있으면 hold 로 본다 */
+const HOLD_MS = 320;
+
 export interface BoardRenderState {
   cells: Board;
   selection: ReadonlySet<number>;
@@ -21,8 +31,16 @@ export class BoardView {
   private dragPointer: number | null = null;
   private dragSelection = new Set<number>();
   private lastPoint: { x: number; y: number } | null = null;
+  /** 마지막으로 렌더링한 선택 (탭이 '이미 선택된 칸'인지 판단용) */
+  private currentSelection: ReadonlySet<number> = new Set();
+  private holdTimer = 0;
+  private hold: HoldHandler | null = null;
 
-  constructor(private readonly onSelect: (sel: Set<number>) => void) {
+  constructor(
+    private readonly onSelect: (sel: Set<number>) => void,
+    /** 선택된 한 칸을 길게 눌렀을 때. 동작을 시작하지 않으려면 null 을 돌려준다. */
+    private readonly onHold?: (index: number, cellCenter: { x: number; y: number }, pointer: { x: number; y: number }) => HoldHandler | null,
+  ) {
     this.el = h('div', { class: 'board', role: 'grid', 'aria-label': '스도쿠 보드' });
     for (let i = 0; i < CELL_COUNT; i++) {
       const value = h('span', { class: 'value' });
@@ -71,21 +89,57 @@ export class BoardView {
     return changed;
   }
 
+  private cellCenter(i: number): { x: number; y: number } {
+    const rect = this.el.getBoundingClientRect();
+    const cs = rect.width / SIZE;
+    return { x: rect.left + (colOf(i) + 0.5) * cs, y: rect.top + (rowOf(i) + 0.5) * cs };
+  }
+
+  private cancelHoldTimer(): void {
+    if (this.holdTimer) {
+      clearTimeout(this.holdTimer);
+      this.holdTimer = 0;
+    }
+  }
+
   private bindPointer(): void {
     this.el.addEventListener('pointerdown', (e) => {
       if (this.dragPointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
       const idx = this.indexAt(e.clientX, e.clientY);
       if (idx === null) return;
       e.preventDefault();
+      const wasOnlySelected = this.currentSelection.size === 1 && this.currentSelection.has(idx);
       this.dragPointer = e.pointerId;
       this.el.setPointerCapture(e.pointerId);
       this.dragSelection = new Set([idx]);
       this.lastPoint = { x: e.clientX, y: e.clientY };
       this.onSelect(new Set(this.dragSelection));
+
+      if (wasOnlySelected && this.onHold) {
+        const pointer = { x: e.clientX, y: e.clientY };
+        this.holdTimer = window.setTimeout(() => {
+          this.holdTimer = 0;
+          if (this.dragPointer === null) return;
+          this.hold = this.onHold!(idx, this.cellCenter(idx), this.lastPoint ?? pointer);
+        }, HOLD_MS);
+      }
     });
 
     this.el.addEventListener('pointermove', (e) => {
       if (e.pointerId !== this.dragPointer) return;
+      if (this.hold) {
+        this.hold.move(e.clientX, e.clientY);
+        return;
+      }
+      // 길게 누르기 대기 중: 같은 칸 안에서의 작은 흔들림은 무시, 다른 칸으로 가면 드래그 선택으로 전환
+      if (this.holdTimer) {
+        const idx = this.indexAt(e.clientX, e.clientY);
+        if (idx !== null && this.dragSelection.has(idx)) {
+          this.lastPoint = { x: e.clientX, y: e.clientY };
+          return;
+        }
+        this.cancelHoldTimer();
+      }
       const events = e.getCoalescedEvents?.() ?? [e];
       let changed = false;
       for (const ev of events.length ? events : [e]) {
@@ -98,13 +152,22 @@ export class BoardView {
       if (e.pointerId !== this.dragPointer) return;
       this.dragPointer = null;
       this.lastPoint = null;
+      this.cancelHoldTimer();
+      const hold = this.hold;
+      this.hold = null;
+      if (hold) {
+        if (e.type === 'pointerup') hold.end(e.clientX, e.clientY);
+        else hold.close();
+      }
     };
     this.el.addEventListener('pointerup', end);
     this.el.addEventListener('pointercancel', end);
+    this.el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   render(state: BoardRenderState): void {
     const { cells, selection, conflicts, mistakes } = state;
+    this.currentSelection = selection;
     const single = selection.size === 1 ? [...selection][0]! : null;
     const focusValue = single !== null ? valueOf(cells[single]!) : 0;
 

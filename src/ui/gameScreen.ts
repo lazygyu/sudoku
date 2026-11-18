@@ -21,8 +21,8 @@ import {
 import { clearGame, loadSolved, markSolved, saveGame, saveSettings, type SavedGame, type Settings } from '../storage';
 import { formatTime, Timer } from '../timer';
 import { BoardView } from './board';
-import { h } from './dom';
-import { attachRadial } from './radial';
+import { h, vibrate } from './dom';
+import { attachRadial, RadialSession, type RadialMenuOptions } from './radial';
 
 const ICON = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -124,10 +124,18 @@ export class GameScreen {
     );
 
     // 보드
-    this.board = new BoardView((sel) => {
-      this.selection = sel;
-      this.render();
-    });
+    this.board = new BoardView(
+      (sel) => {
+        this.selection = sel;
+        this.render();
+      },
+      // 선택된 한 칸을 길게 누르면 그 칸 주위에 답 입력 링을 띄운다
+      (_idx, center, pointer) => {
+        if (!this.canAnswer()) return null;
+        vibrate(15);
+        return new RadialSession(this.answerRadial, center, pointer);
+      },
+    );
     this.boardWrap = h('div', { class: 'board-wrap' }, this.board.el);
 
     // 하단 컨트롤
@@ -147,16 +155,7 @@ export class GameScreen {
       digitState: (d) => ({ active: allHaveNote(this.cells, this.selection, d) }),
       onPick: (d) => this.note(d),
     });
-    const counts = () => digitCounts(this.cells);
-    attachRadial(this.answerBtn, {
-      kind: 'answer',
-      isEnabled: () => this.canAnswer(),
-      digitState: (d) => {
-        const idx = this.singleIndex();
-        return { active: idx !== null && this.cells[idx]!.answer === d, done: counts()[d]! >= SIZE };
-      },
-      onPick: (d) => this.answer(d),
-    });
+    attachRadial(this.answerBtn, { ...this.answerRadial, isEnabled: () => this.canAnswer() });
 
     const controls = h(
       'footer',
@@ -166,6 +165,14 @@ export class GameScreen {
     );
 
     this.el = h('div', { class: 'screen game-screen' }, top, this.boardWrap, controls);
+    // 보드와 버튼, 설정 패널 바깥의 빈 곳을 누르면 선택 해제
+    this.el.addEventListener('pointerdown', (e) => {
+      const t = e.target as Element;
+      if (t.closest('.board, button, label, input, .settings-panel, .complete-overlay')) return;
+      if (this.selection.size === 0) return;
+      this.selection = new Set();
+      this.render();
+    });
 
     this.bindGlobal();
     this.fitBoard();
@@ -174,9 +181,18 @@ export class GameScreen {
     if (!this.solved) {
       this.save();
       this.resume();
-    }
-    else this.showComplete();
+    } else this.showComplete();
   }
+
+  /** 답 입력 링 설정 (답 버튼과 칸 길게 누르기에서 공용) */
+  private readonly answerRadial: RadialMenuOptions = {
+    kind: 'answer',
+    digitState: (d) => {
+      const idx = this.singleIndex();
+      return { active: idx !== null && this.cells[idx]!.answer === d, done: digitCounts(this.cells)[d]! >= SIZE };
+    },
+    onPick: (d) => this.answer(d),
+  };
 
   // ---- 상태 헬퍼 ----
 
