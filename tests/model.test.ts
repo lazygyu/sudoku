@@ -4,6 +4,7 @@ import {
   applyChanges,
   canErase,
   createBoard,
+  diffBoards,
   erase,
   fillCandidateNotes,
   noteDigits,
@@ -196,5 +197,22 @@ describe('History', () => {
     const h = new History();
     h.push([]);
     expect(h.canUndo).toBe(false);
+  });
+});
+
+describe('diffBoards', () => {
+  it('변경 목록을 적용하면 대상 보드가 되고, 되돌리면 원래 보드가 된다', () => {
+    const start = createBoard(new Array(81).fill(0));
+    const snap = applyChanges(start, setAnswer(start, 0, 5));
+    const later = applyChanges(snap, [...setAnswer(snap, 1, 3), ...toggleNote(snap, [2], 7)]);
+    const changes = diffBoards(later, snap);
+    expect(changes.map((c) => c.index).sort()).toEqual([1, 2]);
+    expect(applyChanges(later, changes)).toEqual(snap);
+    expect(applyChanges(applyChanges(later, changes), changes, 'backward')).toEqual(later);
+  });
+
+  it('같은 보드면 빈 목록', () => {
+    const b = createBoard(new Array(81).fill(0));
+    expect(diffBoards(b, b.slice())).toEqual([]);
   });
 });

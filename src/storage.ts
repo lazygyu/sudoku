@@ -38,6 +38,8 @@ export interface SavedGame {
   cells: Cell[];
   history: HistoryData;
   elapsedMs: number;
+  /** 사용자가 찍어둔 보드 스냅샷 (없으면 생략) */
+  snapshot?: Cell[];
 }
 
 export interface Settings {

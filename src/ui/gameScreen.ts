@@ -5,6 +5,7 @@ import {
   applyChanges,
   canErase,
   createBoard,
+  diffBoards,
   digitCounts,
   erase,
   fillCandidateNotes,
@@ -30,6 +31,10 @@ const ICON = {
   redo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg>',
   erase:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20H9L4 15a2 2 0 010-3l8-8a2 2 0 013 0l5 5a2 2 0 010 3l-8 8"/><path d="M8.5 9.5l6 6"/></svg>',
+  snapshot:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/><path d="M12 7.5v6M9 10.5h6"/></svg>',
+  restore:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 102.5-6"/><path d="M3 3v5h5"/><path d="M12 8v4l3 2"/></svg>',
   settings:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
 };
@@ -56,12 +61,18 @@ export class GameScreen {
   private readonly settings: Settings;
   private selection = new Set<number>();
   private solved = false;
+  /** 사용자가 찍어둔 보드 상태. 복원은 히스토리 한 단계로 쌓여 undo 가능하다. */
+  private snapshot: Cell[] | null = null;
 
   private readonly board: BoardView;
   private readonly timeEl: HTMLSpanElement;
   private readonly undoBtn: HTMLButtonElement;
   private readonly redoBtn: HTMLButtonElement;
   private readonly eraseBtn: HTMLButtonElement;
+  private readonly snapshotBtn: HTMLButtonElement;
+  private readonly restoreBtn: HTMLButtonElement;
+  private readonly toastEl: HTMLDivElement;
+  private toastHandle = 0;
   private readonly noteBtn: HTMLButtonElement;
   private readonly answerBtn: HTMLButtonElement;
   private readonly settingsPanel: HTMLDivElement;
@@ -80,6 +91,7 @@ export class GameScreen {
       this.cells = saved.cells;
       this.history = new History(saved.history);
       this.timer = new Timer(saved.elapsedMs);
+      this.snapshot = saved.snapshot?.length === 81 ? saved.snapshot : null;
     } else {
       const fresh = createBoard(puzzle.value);
       // 시작 상태이므로 히스토리에 넣지 않는다 (undo 로 사라지지 않음)
@@ -145,6 +157,11 @@ export class GameScreen {
     this.undoBtn.addEventListener('click', () => this.undo());
     this.redoBtn.addEventListener('click', () => this.redo());
     this.eraseBtn.addEventListener('click', () => this.eraseSelection());
+    this.snapshotBtn = iconButton(ICON.snapshot, '스냅샷 저장');
+    this.restoreBtn = iconButton(ICON.restore, '스냅샷으로 되돌리기', 'restore');
+    this.snapshotBtn.addEventListener('click', () => this.takeSnapshot());
+    this.restoreBtn.addEventListener('click', () => this.restoreSnapshot());
+    this.toastEl = h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' });
 
     this.noteBtn = h('button', { class: 'big-btn note-btn', type: 'button' }, h('span', { class: 'big-icon', text: '✎' }), h('span', { text: '노트' }));
     this.answerBtn = h('button', { class: 'big-btn answer-btn', type: 'button' }, h('span', { class: 'big-icon', text: '#' }), h('span', { text: '답' }));
@@ -160,11 +177,17 @@ export class GameScreen {
     const controls = h(
       'footer',
       { class: 'controls' },
-      h('div', { class: 'tool-row' }, h('div', { class: 'tool-group' }, this.undoBtn, this.redoBtn), this.eraseBtn),
+      h(
+        'div',
+        { class: 'tool-row' },
+        h('div', { class: 'tool-group' }, this.undoBtn, this.redoBtn),
+        h('div', { class: 'tool-group' }, this.snapshotBtn, this.restoreBtn),
+        this.eraseBtn,
+      ),
       h('div', { class: 'main-row' }, this.noteBtn, this.answerBtn),
     );
 
-    this.el = h('div', { class: 'screen game-screen' }, top, this.boardWrap, controls);
+    this.el = h('div', { class: 'screen game-screen' }, top, this.boardWrap, controls, this.toastEl);
     // 보드와 버튼, 설정 패널 바깥의 빈 곳을 누르면 선택 해제
     this.el.addEventListener('pointerdown', (e) => {
       const t = e.target as Element;
@@ -261,6 +284,32 @@ export class GameScreen {
     this.afterChange();
   }
 
+  takeSnapshot(): void {
+    if (this.solved) return;
+    const replaced = this.snapshot !== null;
+    this.snapshot = this.cells.slice();
+    vibrate(10);
+    this.save();
+    this.render();
+    this.toast(replaced ? '스냅샷을 새로 저장했어요' : '스냅샷을 저장했어요');
+  }
+
+  /** 스냅샷 상태로 되돌린다. 히스토리에 한 단계로 쌓이므로 실행 취소로 되돌릴 수 있다. */
+  restoreSnapshot(): void {
+    if (this.solved || !this.snapshot) return;
+    const changes = diffBoards(this.cells, this.snapshot);
+    if (changes.length === 0) return;
+    this.commit(changes);
+    if (!this.solved) this.toast('스냅샷으로 되돌렸어요');
+  }
+
+  private toast(message: string): void {
+    this.toastEl.textContent = message;
+    this.toastEl.classList.add('show');
+    clearTimeout(this.toastHandle);
+    this.toastHandle = window.setTimeout(() => this.toastEl.classList.remove('show'), 1600);
+  }
+
   // ---- 렌더링 ----
 
   private render(): void {
@@ -272,6 +321,10 @@ export class GameScreen {
     this.undoBtn.disabled = this.solved || !this.history.canUndo;
     this.redoBtn.disabled = this.solved || !this.history.canRedo;
     this.eraseBtn.disabled = this.solved || !canErase(this.cells, this.selection);
+    this.snapshotBtn.disabled = this.solved;
+    this.restoreBtn.disabled =
+      this.solved || !this.snapshot || diffBoards(this.cells, this.snapshot).length === 0;
+    this.restoreBtn.classList.toggle('has-snapshot', this.snapshot !== null);
     this.noteBtn.disabled = !this.canNote();
     this.answerBtn.disabled = !this.canAnswer();
     this.updateTime();
@@ -345,6 +398,7 @@ export class GameScreen {
       cells: this.cells,
       history: this.history.toJSON(),
       elapsedMs: this.timer.elapsedMs,
+      ...(this.snapshot ? { snapshot: this.snapshot } : {}),
     });
   }
 
@@ -418,6 +472,7 @@ export class GameScreen {
   }
 
   destroy(): void {
+    clearTimeout(this.toastHandle);
     this.pause();
     this.cleanups.forEach((f) => f());
     this.el.remove();

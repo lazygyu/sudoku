@@ -784,3 +784,44 @@ button:focus-visible {
   font-size: 12px;
   color: var(--ink-3);
 }
+
+/* ---------- 스냅샷 ---------- */
+.icon-btn.restore {
+  position: relative;
+}
+
+/* 스냅샷이 있으면 복원 버튼에 작은 점을 표시 */
+.icon-btn.restore.has-snapshot::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 140px);
+  transform: translate(-50%, 8px);
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s, transform 0.18s;
+  z-index: 50;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

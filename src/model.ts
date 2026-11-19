@@ -158,6 +158,16 @@ export function canErase(board: Board, selection: Iterable<number>): boolean {
   return false;
 }
 
+/** from 보드를 to 보드로 바꾸는 변경 목록 (스냅샷 복원에 사용) */
+export function diffBoards(from: Board, to: Board): Change[] {
+  const changes: Change[] = [];
+  for (let i = 0; i < CELL_COUNT; i++) {
+    const ch = change(from, i, to[i]!);
+    if (ch) changes.push(ch);
+  }
+  return changes;
+}
+
 export function applyChanges(board: Board, changes: readonly Change[], dir: 'forward' | 'backward' = 'forward'): Cell[] {
   const next = board.slice();
   const list = dir === 'forward' ? changes : [...changes].reverse();
