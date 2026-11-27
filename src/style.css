@@ -771,6 +771,33 @@ button:focus-visible {
   color: var(--ink-3);
 }
 
+.radial-label.picking {
+  font-size: 22px;
+  color: var(--ink);
+}
+
+.radial-answer .radial-label.picking {
+  color: var(--accent);
+}
+
+.radial-bubble {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 34px;
+  font-weight: 800;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.radial-bubble[hidden] {
+  display: none;
+}
+
 .radial-digit {
   position: absolute;
   transform: translate(-50%, -50%);

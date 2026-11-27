@@ -28,6 +28,8 @@ export interface Point {
 
 /** 이 거리 이상 움직여야 드래그로 간주한다 (px) */
 const MOVE_THRESHOLD = 14;
+/** 고르는 중인 숫자를 보여주는 말풍선 지름 (px) */
+const BUBBLE_SIZE = 64;
 
 /**
  * 1~9 숫자 링 하나의 생명주기.
@@ -38,6 +40,9 @@ export class RadialSession {
   private readonly overlay: HTMLDivElement;
   private readonly digitEls: HTMLDivElement[] = [];
   private readonly centers: Point[] = [];
+  private readonly labelEl: HTMLDivElement;
+  private readonly bubbleEl: HTMLDivElement;
+  private readonly labelText: string;
   private readonly hitRadius: number;
   private moved = false;
   private hovered: number | null = null;
@@ -64,17 +69,32 @@ export class RadialSession {
     // 가장 가까운 숫자를 고르므로 이웃과 겹쳐도 되지만, 중심(취소 영역)까지 닿지는 않게 한다
     this.hitRadius = radius * 0.7;
 
+    this.labelText = opts.kind === 'note' ? '노트' : '답';
+    this.labelEl = h('div', {
+      class: 'radial-label',
+      style: `left:${cx}px;top:${cy}px`,
+      text: this.labelText,
+    });
+
+    // 손가락에 가리지 않도록 고르는 중인 숫자를 링 바깥(기본은 위쪽)에 크게 보여준다
+    const bubbleHalf = BUBBLE_SIZE / 2;
+    const gap = 10;
+    const above = cy - reach - gap - bubbleHalf;
+    const by = above - bubbleHalf >= 8 ? above : cy + reach + gap + bubbleHalf;
+    const bx = Math.min(Math.max(cx, bubbleHalf + 8), vw - bubbleHalf - 8);
+    this.bubbleEl = h('div', {
+      class: 'radial-bubble',
+      style: `left:${bx}px;top:${by}px;width:${BUBBLE_SIZE}px;height:${BUBBLE_SIZE}px`,
+      hidden: true,
+    });
+
     this.overlay = h('div', { class: `radial radial-${opts.kind}` });
     this.overlay.append(
       h('div', {
         class: 'radial-ring',
         style: `left:${cx}px;top:${cy}px;width:${radius * 2 + size}px;height:${radius * 2 + size}px`,
       }),
-      h('div', {
-        class: 'radial-label',
-        style: `left:${cx}px;top:${cy}px`,
-        text: opts.kind === 'note' ? '노트' : '답',
-      }),
+      this.labelEl,
     );
     for (let d = 1; d <= SIZE; d++) {
       // 1이 12시 방향, 시계 방향으로 배치
@@ -94,6 +114,7 @@ export class RadialSession {
       this.digitEls.push(el);
       this.overlay.append(el);
     }
+    this.overlay.append(this.bubbleEl);
     document.body.append(this.overlay);
     window.addEventListener('blur', this.onBlur);
   }
@@ -123,6 +144,11 @@ export class RadialSession {
       this.digitEls[d - 1]?.classList.add('hover');
       vibrate(8);
     }
+    // 가운데와 말풍선에 고르는 중인 숫자를 표시
+    this.labelEl.textContent = d !== null ? String(d) : this.labelText;
+    this.labelEl.classList.toggle('picking', d !== null);
+    this.bubbleEl.hidden = d === null;
+    if (d !== null) this.bubbleEl.textContent = String(d);
   }
 
   move(x: number, y: number): void {
