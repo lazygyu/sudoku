@@ -238,6 +238,25 @@ button:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.mini-board {
+  width: 92px;
+  flex: none;
+}
+
+.continue-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.continue-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
 .filters {
   display: flex;
   gap: 8px;
@@ -383,10 +402,97 @@ button:focus-visible {
   }
 }
 
-.more-row {
+.difficulty-grid {
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.difficulty-btn {
+  --c: var(--ink-2);
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  margin-top: 16px;
+  gap: 10px;
+  min-height: 104px;
+  padding: 16px 8px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: transform 0.1s, opacity 0.12s;
+}
+.difficulty-btn.diff-easy {
+  --c: var(--easy);
+}
+.difficulty-btn.diff-medium {
+  --c: var(--medium);
+}
+.difficulty-btn.diff-hard {
+  --c: var(--hard);
+}
+
+.difficulty-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.difficulty-btn:disabled:not(.busy) {
+  opacity: 0.45;
+}
+
+.difficulty-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 16%, transparent);
+}
+
+.difficulty-btn .spinner {
+  border-top-color: var(--c);
+}
+
+.difficulty-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c);
+}
+
+.key-row {
+  margin-top: 4px;
+}
+
+.key-row summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.key-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* iOS 에서 포커스 시 자동 확대 방지 */
+}
+
+.text-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 /* ---------- 게임 화면 ---------- */

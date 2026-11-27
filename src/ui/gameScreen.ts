@@ -356,7 +356,7 @@ export class GameScreen {
         ? h('div', { class: 'complete-best', text: `최고 기록 ${formatTime(best)}` })
         : null,
     );
-    const again = h('button', { class: 'primary-btn', type: 'button', text: '다른 문제 고르기' });
+    const again = h('button', { class: 'primary-btn', type: 'button', text: '새 게임' });
     again.addEventListener('click', () => this.exit());
     const close = h('button', { class: 'text-btn', type: 'button', text: '보드 보기' });
     const overlay = h('div', { class: 'complete-overlay' }, h('div', { class: 'complete-box' }, card, again, close));

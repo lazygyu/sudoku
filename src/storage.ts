@@ -1,4 +1,4 @@
-import type { Puzzle } from './api';
+import type { Difficulty, Puzzle } from './api';
 import type { HistoryData } from './history';
 import type { Cell } from './model';
 
@@ -30,7 +30,9 @@ function remove(key: string): void {
 
 const KEY_GAME = 'sudoku:game:v1';
 const KEY_SETTINGS = 'sudoku:settings:v1';
-const KEY_PUZZLES = 'sudoku:puzzles:v1';
+const KEY_SPARE = 'sudoku:spare:v1';
+/** 예전 dosuku API 시절의 문제 목록 (더 이상 쓰지 않음) */
+const KEY_OLD_PUZZLES = 'sudoku:puzzles:v1';
 const KEY_SOLVED = 'sudoku:solved:v1';
 
 export interface SavedGame {
@@ -47,9 +49,11 @@ export interface Settings {
   showMistakes: boolean;
   /** 새 게임 시작 시 제시 숫자 기준 후보를 모두 노트로 채움 */
   autoFillNotes: boolean;
+  /** API Ninjas 키 (사용자가 직접 입력, 비어 있으면 빌드 기본 키 사용) */
+  apiKey: string;
 }
 
-const DEFAULT_SETTINGS: Settings = { showMistakes: false, autoFillNotes: false };
+const DEFAULT_SETTINGS: Settings = { showMistakes: false, autoFillNotes: false, apiKey: '' };
 
 export const loadGame = (): SavedGame | null => {
   const g = read<SavedGame>(KEY_GAME);
@@ -61,9 +65,21 @@ export const clearGame = (): void => remove(KEY_GAME);
 export const loadSettings = (): Settings => ({ ...DEFAULT_SETTINGS, ...read<Settings>(KEY_SETTINGS) });
 export const saveSettings = (s: Settings): void => write(KEY_SETTINGS, s);
 
-/** 마지막으로 받아온 문제 목록 (오프라인에서도 목록을 보여주기 위함) */
-export const loadPuzzleList = (): Puzzle[] => read<Puzzle[]>(KEY_PUZZLES) ?? [];
-export const savePuzzleList = (list: Puzzle[]): void => write(KEY_PUZZLES, list.slice(-60));
+/**
+ * 난이도별로 미리 받아둔 문제 하나씩.
+ * 새 게임을 바로 시작할 수 있고, 오프라인에서도 한 판은 할 수 있다.
+ */
+type SpareMap = Partial<Record<Difficulty, Puzzle>>;
+const loadSpares = (): SpareMap => read<SpareMap>(KEY_SPARE) ?? {};
+export const loadSpare = (d: Difficulty): Puzzle | null => loadSpares()[d] ?? null;
+export function saveSpare(d: Difficulty, p: Puzzle | null): void {
+  const spares = loadSpares();
+  if (p) spares[d] = p;
+  else delete spares[d];
+  write(KEY_SPARE, spares);
+}
+
+remove(KEY_OLD_PUZZLES);
 
 /** 완료한 문제 id → 기록(ms) */
 export const loadSolved = (): Record<string, number> => read<Record<string, number>>(KEY_SOLVED) ?? {};
