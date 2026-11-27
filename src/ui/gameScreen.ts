@@ -141,7 +141,7 @@ export class GameScreen {
         this.selection = sel;
         this.render();
       },
-      // 선택된 한 칸을 길게 누르면 그 칸 주위에 답 입력 링을 띄운다
+      // 한 칸을 길게 누르면 그 칸이 선택되고 주위에 답 입력 링이 뜬다 (제시 숫자 칸은 제외)
       (_idx, center, pointer) => {
         if (!this.canAnswer()) return null;
         vibrate(15);

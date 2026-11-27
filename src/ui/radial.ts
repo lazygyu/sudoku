@@ -55,12 +55,14 @@ export class RadialSession {
   ) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const radius = Math.min(116, vw * 0.3);
-    const size = Math.min(60, radius * 0.58);
+    // 손가락 이동 거리를 줄이기 위해 작게 둔다 (이웃 숫자 중심 간격 ≈ 0.68 × radius)
+    const radius = Math.min(58, vw * 0.15);
+    const size = radius * 0.64;
     const reach = radius + size / 2 + 8;
     const cx = Math.min(Math.max(center.x, reach), vw - reach);
     const cy = Math.min(Math.max(center.y, reach), vh - reach);
-    this.hitRadius = radius * 0.55;
+    // 가장 가까운 숫자를 고르므로 이웃과 겹쳐도 되지만, 중심(취소 영역)까지 닿지는 않게 한다
+    this.hitRadius = radius * 0.7;
 
     this.overlay = h('div', { class: `radial radial-${opts.kind}` });
     this.overlay.append(

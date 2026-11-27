@@ -798,6 +798,8 @@ button:focus-visible {
 }
 
 .radial-digit.hover {
+  /* 링이 작아져 확대되면 이웃과 겹치므로 위로 올린다 */
+  z-index: 1;
   transform: translate(-50%, -50%) scale(1.25);
   background: var(--accent);
   color: var(--accent-ink);

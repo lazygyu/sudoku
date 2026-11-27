@@ -8,7 +8,7 @@ export interface HoldHandler {
   close(): void;
 }
 
-/** 이미 하나만 선택된 칸을 이 시간(ms) 이상 누르고 있으면 hold 로 본다 */
+/** 한 칸을 이 시간(ms) 이상 움직이지 않고 누르고 있으면 hold 로 본다 */
 const HOLD_MS = 320;
 
 export interface BoardRenderState {
@@ -31,14 +31,12 @@ export class BoardView {
   private dragPointer: number | null = null;
   private dragSelection = new Set<number>();
   private lastPoint: { x: number; y: number } | null = null;
-  /** 마지막으로 렌더링한 선택 (탭이 '이미 선택된 칸'인지 판단용) */
-  private currentSelection: ReadonlySet<number> = new Set();
   private holdTimer = 0;
   private hold: HoldHandler | null = null;
 
   constructor(
     private readonly onSelect: (sel: Set<number>) => void,
-    /** 선택된 한 칸을 길게 눌렀을 때. 동작을 시작하지 않으려면 null 을 돌려준다. */
+    /** 한 칸을 길게 눌렀을 때 (그 칸이 선택된 뒤 호출됨). 동작을 시작하지 않으려면 null 을 돌려준다. */
     private readonly onHold?: (index: number, cellCenter: { x: number; y: number }, pointer: { x: number; y: number }) => HoldHandler | null,
   ) {
     this.el = h('div', { class: 'board', role: 'grid', 'aria-label': '스도쿠 보드' });
@@ -108,14 +106,13 @@ export class BoardView {
       const idx = this.indexAt(e.clientX, e.clientY);
       if (idx === null) return;
       e.preventDefault();
-      const wasOnlySelected = this.currentSelection.size === 1 && this.currentSelection.has(idx);
       this.dragPointer = e.pointerId;
       this.el.setPointerCapture(e.pointerId);
       this.dragSelection = new Set([idx]);
       this.lastPoint = { x: e.clientX, y: e.clientY };
       this.onSelect(new Set(this.dragSelection));
 
-      if (wasOnlySelected && this.onHold) {
+      if (this.onHold) {
         const pointer = { x: e.clientX, y: e.clientY };
         this.holdTimer = window.setTimeout(() => {
           this.holdTimer = 0;
@@ -167,7 +164,6 @@ export class BoardView {
 
   render(state: BoardRenderState): void {
     const { cells, selection, conflicts, mistakes } = state;
-    this.currentSelection = selection;
     const single = selection.size === 1 ? [...selection][0]! : null;
     const focusValue = single !== null ? valueOf(cells[single]!) : 0;
 
