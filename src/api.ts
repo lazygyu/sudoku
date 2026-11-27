@@ -1,4 +1,5 @@
 import { CELL_COUNT } from './model';
+import { hasUniqueSolution } from './solver';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 export const DIFFICULTIES: readonly Difficulty[] = ['Easy', 'Medium', 'Hard'];
@@ -56,10 +57,13 @@ export function parseResponse(json: unknown, difficulty: Difficulty): Puzzle {
   if (!value || !solution) throw new Error('예상하지 못한 응답 형식입니다');
   if (!isValidSolution(solution)) throw new Error('정답이 올바르지 않은 문제를 받았습니다');
   if (value.some((v, i) => v !== 0 && v !== solution[i])) throw new Error('제시 숫자가 정답과 맞지 않는 문제를 받았습니다');
+  if (!hasUniqueSolution(value)) throw new NonUniqueError('해가 여러 개인 문제를 받았습니다');
   return { id: puzzleId(value), value, solution, difficulty };
 }
 
 export class ApiKeyError extends Error {}
+/** 해가 하나로 정해지지 않는 문제. 다시 받으면 된다 */
+export class NonUniqueError extends Error {}
 
 export async function fetchPuzzle(difficulty: Difficulty, apiKey: string, timeoutMs = 15000): Promise<Puzzle> {
   if (!apiKey) throw new ApiKeyError('API 키가 없습니다');
@@ -92,6 +96,29 @@ export async function fetchPuzzle(difficulty: Difficulty, apiKey: string, timeou
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 해가 여러 개인 문제를 받으면 다시 받는 최대 횟수 */
+const MAX_TRIES = 6;
+
+/**
+ * 해가 하나뿐인 문제를 받을 때까지 다시 요청한다.
+ * 네트워크 오류 등은 한 번만 다시 시도하고, 키 오류는 바로 실패한다.
+ */
+export async function fetchUniquePuzzle(difficulty: Difficulty, apiKey: string): Promise<Puzzle> {
+  let otherFailures = 0;
+  let lastError: unknown;
+  for (let i = 0; i < MAX_TRIES; i++) {
+    try {
+      return await fetchPuzzle(difficulty, apiKey);
+    } catch (e) {
+      lastError = e;
+      if (e instanceof ApiKeyError) throw e;
+      if (!(e instanceof NonUniqueError) && ++otherFailures > 1) throw e;
+    }
+  }
+  if (lastError instanceof NonUniqueError) throw new Error('해가 하나뿐인 문제를 받지 못했습니다');
+  throw lastError;
 }
 
 export const DIFFICULTY_LABEL: Record<string, string> = {

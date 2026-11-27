@@ -1,4 +1,4 @@
-import { ApiKeyError, BUILT_IN_KEY, DIFFICULTIES, difficultyLabel, fetchPuzzle, type Difficulty, type Puzzle } from '../api';
+import { ApiKeyError, BUILT_IN_KEY, DIFFICULTIES, difficultyLabel, fetchUniquePuzzle, type Difficulty, type Puzzle } from '../api';
 import { CELL_COUNT, valueOf, type Cell } from '../model';
 import { loadSpare, saveSettings, saveSpare, type SavedGame, type Settings } from '../storage';
 import { formatTime } from '../timer';
@@ -25,19 +25,12 @@ function miniBoard(values: readonly number[], user?: readonly Cell[]): HTMLDivEl
   return el;
 }
 
-/** 한 번 실패하면 한 번 더 시도한다 (키 오류는 다시 해도 소용없으므로 제외) */
-const fetchWithRetry = (d: Difficulty, key: string): Promise<Puzzle> =>
-  fetchPuzzle(d, key).catch((e: unknown) => {
-    if (e instanceof ApiKeyError) throw e;
-    return fetchPuzzle(d, key);
-  });
-
 /** 다음 게임을 바로 시작할 수 있도록 미리 한 문제를 받아둔다. 실패해도 조용히 넘어간다 */
 const refilling = new Set<Difficulty>();
 function refillSpare(d: Difficulty, key: string): void {
   if (refilling.has(d) || loadSpare(d)) return;
   refilling.add(d);
-  fetchPuzzle(d, key)
+  fetchUniquePuzzle(d, key)
     .then((p) => saveSpare(d, p))
     .catch(() => {})
     .finally(() => refilling.delete(d));
@@ -171,7 +164,7 @@ export class HomeScreen {
     this.error = null;
     this.render();
     try {
-      const puzzle = await fetchWithRetry(d, key);
+      const puzzle = await fetchUniquePuzzle(d, key);
       if (this.destroyed) return;
       refillSpare(d, key);
       this.opts.onNew(puzzle);

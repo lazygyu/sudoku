@@ -1,6 +1,7 @@
 import type { Difficulty, Puzzle } from './api';
 import type { HistoryData } from './history';
 import type { Cell } from './model';
+import { hasUniqueSolution } from './solver';
 
 /** localStorage 는 사생활 보호 모드 등에서 실패할 수 있으므로 모두 try/catch 로 감싼다 */
 function read<T>(key: string): T | null {
@@ -71,7 +72,16 @@ export const saveSettings = (s: Settings): void => write(KEY_SETTINGS, s);
  */
 type SpareMap = Partial<Record<Difficulty, Puzzle>>;
 const loadSpares = (): SpareMap => read<SpareMap>(KEY_SPARE) ?? {};
-export const loadSpare = (d: Difficulty): Puzzle | null => loadSpares()[d] ?? null;
+export function loadSpare(d: Difficulty): Puzzle | null {
+  const p = loadSpares()[d];
+  if (!p) return null;
+  // 유일해 검사를 넣기 전에 받아둔 문제일 수 있으므로 다시 확인한다
+  if (!Array.isArray(p.value) || p.value.length !== 81 || !hasUniqueSolution(p.value)) {
+    saveSpare(d, null);
+    return null;
+  }
+  return p;
+}
 export function saveSpare(d: Difficulty, p: Puzzle | null): void {
   const spares = loadSpares();
   if (p) spares[d] = p;

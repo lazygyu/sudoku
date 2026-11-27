@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseResponse } from '../src/api';
+import { NonUniqueError, parseResponse } from '../src/api';
 
 // 유효한 정답 (행 이동 패턴)
 const SOLUTION = Array.from({ length: 9 }, (_, r) =>
@@ -27,6 +27,11 @@ describe('parseResponse', () => {
     const bad = SOLUTION.map((row) => [...row]);
     [bad[0]![0], bad[0]![1]] = [bad[0]![1]!, bad[0]![0]!];
     expect(() => parseResponse({ puzzle: PUZZLE.map(() => Array(9).fill(null)), solution: bad }, 'Easy')).toThrow();
+  });
+
+  it('해가 여러 개인 문제는 NonUniqueError 로 거부한다', () => {
+    const empty = SOLUTION.map(() => Array(9).fill(null));
+    expect(() => parseResponse({ puzzle: empty, solution: SOLUTION }, 'Easy')).toThrow(NonUniqueError);
   });
 
   it('제시 숫자가 정답과 다르면 거부한다', () => {

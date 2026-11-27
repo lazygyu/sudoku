@@ -42,6 +42,7 @@ src/
   model.ts         보드 규칙 (순수 함수, Change[] 반환)
   history.ts       undo/redo 스택 (동작 하나 = 한 단계)
   api.ts           문제 API 호출/검증
+  solver.ts        해 개수 세기 (유일해 검사)
   storage.ts       localStorage 저장 (진행 게임, 설정, 예비 문제, 완료 기록)
   timer.ts         일시정지 가능한 타이머
   ui/board.ts      보드 렌더링, 탭/드래그 선택
@@ -50,6 +51,7 @@ src/
   ui/homeScreen.ts 홈 화면 (이어하기, 난이도 선택)
 tests/model.test.ts
 tests/api.test.ts
+tests/solver.test.ts
 ```
 
 ## API 메모
@@ -61,4 +63,5 @@ tests/api.test.ts
   빌드할 때 `VITE_API_NINJAS_KEY=... npm run build` 로 기본 키를 넣을 수도 있지만, 그러면 키가 공개 번들에 그대로 들어가서
   누구나 볼 수 있다. GitHub Pages 처럼 공개 배포라면 권장하지 않는다.
 - 무료 플랜은 월 요청 한도가 있고 상업적 이용은 안 된다.
+- 해가 여러 개인 문제가 섞여 오므로, 받은 문제는 `solver.ts`로 해 개수를 세어(2개에서 멈춤, 어려운 문제도 수 ms) 유일해가 아니면 버리고 최대 6번까지 다시 받는다.
 - 난이도마다 문제를 하나씩 미리 받아둬서(`sudoku:spare:v1`) 다음 새 게임은 기다리지 않고 시작하고, 오프라인에서도 한 판은 할 수 있다.
